@@ -4,19 +4,34 @@
 
 > 传统金价监控用 REST API + cron + 邮件；这个项目用 **MCP 原生设计**，让 AI Agent 能直接查询金融数据、推理趋势、触发通知——更智能、可组合、可扩展。
 
-## 为什么做这个
+## 让 Hermes Agent 搭建
 
-金价监控脚本 GitHub 上很多，但大多是传统模式：
+把下面这段话复制给 Hermes Agent，它会自动完成搭建：
 
 ```
-传统：  [REST API] → [Python 脚本] → [系统 Cron] → [邮件/Telegram]
-本项目：[MCP 数据源] → [AI Agent 编排] → [Bark 推送] → [iPhone]
+帮我搭建金价监控。我已安装 gold-price-monitor：
+
+项目路径：D:\projectdemo\gold-price-monitor
+
+需要你做的事：
+1. 复制 config_template.yaml 为 config.yaml，填入我的 Token：
+   - 金十数据 Token：sk-xxx（替换为你的）
+   - Bark Key：xxx（替换为你的）
+2. 运行 install.py 安装脚本和 skill 到 Hermes
+3. 创建定时任务：每 10 分钟运行 gold_monitor.py，涨跌幅超 1% 推送通知
 ```
 
-**MCP 原生**意味着：
-- 金融数据对 AI Agent **可查询、可推理、可组合**
-- 不是写死的脚本，Agent 可以根据上下文决定查什么、怎么通知
-- 天然兼容所有支持 MCP 的 AI 框架（Hermes、Claude、Cursor 等）
+**前置条件**：
+
+| 需要准备 | 获取方式 |
+|---------|----------|
+| Python 3.11+ | [python.org](https://www.python.org/downloads/) |
+| 金十数据 Token（`sk-xxx`） | [mcp.jin10.com/app](https://mcp.jin10.com/app/) |
+| Bark Key | iPhone 安装 [Bark](https://bark.day.app)，打开即显示 |
+
+**常用品种代码**：`CZBJCJ`（浙商积存金）、`ICBCRYJCJ`（工行如意积存金）、`XAUUSD`（现货黄金/美元）
+
+---
 
 ## 架构
 
@@ -92,89 +107,6 @@
 ❌ 积存金监控异常
 原因: jin10_client执行失败
 时间: 2026-06-30 19:00:00
-```
-
-## 从零搭建（7 步）
-
-### 前置条件
-
-| # | 需要准备 | 说明 | 获取方式 |
-|---|---------|------|----------|
-| 1 | **Hermes Agent** | AI Agent 框架 | [安装文档](https://hermes-agent.nousresearch.com/docs) |
-| 2 | **Python 3.11+** | 运行脚本 | [python.org](https://www.python.org/downloads/) |
-| 3 | **金十数据 Token** | 格式 `sk-xxx` | [mcp.jin10.com/app](https://mcp.jin10.com/app/) |
-| 4 | **Bark Key** | iOS 推送 | App Store 安装 Bark |
-
-### Step 1: 准备环境
-
-```bash
-python --version          # 确认 3.11+
-pip install pyyaml
-```
-
-### Step 2: 获取 Token
-
-- **金十数据**：访问 [mcp.jin10.com/app](https://mcp.jin10.com/app/)，注册后获取 MCP Token（`sk-xxx`）
-- **Bark**：iPhone 安装 Bark，打开即显示 Key
-
-### Step 3: 配置
-
-```bash
-cp config_template.yaml config.yaml   # Windows: copy
-```
-
-编辑 `config.yaml`，填入 Token：
-
-```yaml
-jin10:
-  url: "https://mcp.jin10.com/mcp"
-  token: "sk-你的Token"
-
-bark:
-  key: "你的BarkKey"
-
-monitor:
-  quote_code: "CZBJCJ"       # 浙商积存金（人民币/克）
-  trend_threshold: 0.01      # 趋势阈值 1%
-```
-
-**常用品种代码**：`CZBJCJ`（浙商积存金）、`ICBCRYJCJ`（工行如意积存金）、`XAUUSD`（现货黄金/美元）
-
-### Step 4: 安装到 Hermes
-
-```bash
-python install.py
-```
-
-自动复制脚本 + skill 到 Hermes 目录。
-
-### Step 5: 验证环境
-
-```bash
-python scripts/check_env.py
-```
-
-预期输出：Python ✓、依赖 ✓、Token ✓、金十连接 ✓、Bark ✓
-
-### Step 6: 手动测试
-
-```bash
-python scripts/gold_monitor.py
-```
-
-首次运行初始化基准价，iPhone 应收到 Bark 通知。
-
-### Step 7: 创建定时任务
-
-在 Hermes 对话中：
-
-```
-创建定时任务：
-- name: 金价监控
-- schedule: "*/10 * * * *"
-- script: gold_monitor.py
-- no_agent: true
-- deliver: local
 ```
 
 ## MCP 可用工具
