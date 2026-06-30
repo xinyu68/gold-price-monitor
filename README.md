@@ -69,7 +69,7 @@ pip install pyyaml
 2. 进入个人中心或开发者页面，获取 MCP 服务的 API Token
 3. Token 格式为 `sk-xxxxxxxxxxxxxxxx`（以 `sk-` 开头的字符串）
 
-> 如果找不到 Token 获取入口，可以访问 [mcp.jin10.com](https://mcp.jin10.com) 查看。
+> 如果找不到 Token 获取入口，可以访问 [mcp.jin10.com/app](https://mcp.jin10.com/app/) 获取。
 
 #### 2.2 Bark 推送 Key
 
