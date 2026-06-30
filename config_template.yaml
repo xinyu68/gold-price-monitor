@@ -1,0 +1,59 @@
+# 金价推送工具配置文件
+# 复制此文件为 config.yaml 并填入你的真实 Token
+
+# 金十数据 MCP 配置
+# 获取方式：注册金十数据账号后获取 MCP Bearer Token
+jin10:
+  url: "https://mcp.jin10.com/mcp"
+  token: "sk-你的金十数据Token"
+
+# Bark 推送配置
+# 获取方式：安装 Bark App 后复制推送 Key
+bark:
+  key: "你的Bark推送Key"
+
+# 监控配置
+monitor:
+  # 品种代码（可选值见下方表格）
+  quote_code: "CZBJCJ"
+
+  # 趋势启动阈值（0.01 = 1%，涨/跌超过此值触发趋势通知）
+  trend_threshold: 0.01
+
+  # 回调/反弹阈值（0.01 = 1%，回撤超过此值通知趋势结束）
+  retrace_threshold: 0.01
+
+  # 里程碑通知步长（0.01 = 1%，趋势每推进 1% 通知一次）
+  milestone_step: 0.01
+
+# 代理配置（可选）
+# Bark 的 api.day.app 在国内可直连，通常不需要代理
+proxy:
+  enabled: false
+  address: "http://127.0.0.1:7897"
+
+# ====== 常用品种代码 ======
+#
+# 积存金（人民币/克）:
+#   CZBJCJ     浙商积存金
+#   ICBCRYJCJ   工行如意积存金
+#   ZHJCJ       招行积存金
+#   CMBCJCJ     民生积存金
+#   ICBCJCJ     工行积存金
+#
+# 现货贵金属（美元/盎司）:
+#   XAUUSD      现货黄金
+#   XAGUSD      现货白银
+#   XPTUSD      现货铂金
+#   XPDUSD      现货钯金
+#
+# 大宗商品:
+#   USOIL       WTI 原油
+#   UKOIL       布伦特原油
+#   COPPER      现货铜
+#
+# 外汇:
+#   EURUSD      欧元/美元
+#   GBPUSD      英镑/美元
+#   USDJPY      美元/日元
+#   USDCNH      美元/人民币

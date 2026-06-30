@@ -1,0 +1,28 @@
+# 配置文件（含真实 Token）
+config.yaml
+
+# 趋势状态数据
+scripts/gold_last_price.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
