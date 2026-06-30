@@ -1,6 +1,6 @@
 # 金价推送工具
 
-基于 [Hermes Agent](https://hermes-agent.nousresearch.com) + [金十数据 MCP](https://mcp.jin10.com) + [Bark](https://bark.day.app) 的金价实时监控与推送方案。
+基于 [Hermes Agent](https://hermes-agent.nousresearch.com) + [金十数据 MCP](https://mcp.jin10.com/app/) + [Bark](https://bark.day.app) 的金价实时监控与推送方案。
 
 每 10 分钟自动查询金价，识别涨跌趋势，通过 Bark 推送通知到 iPhone。
 
