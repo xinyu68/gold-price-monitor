@@ -9,16 +9,17 @@
 把下面这段话复制给 Hermes Agent，它会自动完成搭建：
 
 ```
-帮我搭建金价监控。我已安装 gold-price-monitor：
+帮我搭建金价监控。
 
-项目路径：D:\projectdemo\gold-price-monitor
+GitHub 地址：https://github.com/xinyu68/gold-price-monitor
 
 需要你做的事：
-1. 复制 config_template.yaml 为 config.yaml，填入我的 Token：
+1. 克隆项目到本地
+2. 复制 config_template.yaml 为 config.yaml，填入我的 Token：
    - 金十数据 Token：sk-xxx（替换为你的）
    - Bark Key：xxx（替换为你的）
-2. 运行 install.py 安装脚本和 skill 到 Hermes
-3. 创建定时任务：每 10 分钟运行 gold_monitor.py，涨跌幅超 1% 推送通知
+3. 运行 install.py 安装脚本和 skill 到 Hermes
+4. 创建定时任务：每 10 分钟运行 gold_monitor.py，涨跌幅超 1% 推送通知
 ```
 
 **前置条件**：
