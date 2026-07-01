@@ -44,7 +44,7 @@ Hermes 会自动克隆项目、安装依赖、配置定时任务，过程中会�
 |------|------|------|
 | 数据源 | [金十数据 MCP](https://mcp.jin10.com/app/) | 实时金价、K线、快讯、财经日历 |
 | 编排层 | [Hermes Agent](https://hermes-agent.nousresearch.com) | 定时任务、AI 推理、错误处理 |
-| 推送层 | [Bark](https://bark.day.app) | iOS 推送通知（国内直连） |
+| 推送层 | [Bark](https://bark.day.app) | iOS 推送通知（需代理访问） |
 | 协议 | MCP Streamable HTTP | AI Agent 原生数据接口 |
 
 ## 监控策略
@@ -132,7 +132,7 @@ gold-price-monitor/
 ## 常见问题
 
 **Q: 定时任务只执行一次就消失了？**
-用 `schedule: "*/10 * * * *"`（cron 表达式），不要用 `schedule: "10m"`（一次性延迟）。
+用 `schedule: "*/5 * * * *"`（cron 表达式），不要用 `schedule: "5m"`（一次性延迟）。
 
 **Q: Bark 推送收不到？**
 测试直连：`curl https://api.day.app/{你的Key}/test/test`

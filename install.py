@@ -81,7 +81,7 @@ def main():
     print(f"   python {project_dir}\\scripts\\check_env.py")
     print()
     print("4. 在 Hermes 中创建定时任务：")
-    print('   创建定时任务 name=金价监控 schedule="*/10 * * * *" script=gold_monitor.py no_agent=true deliver=local')
+    print('   创建定时任务 name=金价监控 schedule="*/5 * * * *" script=gold_monitor.py no_agent=true deliver=local')
     print()
 
     return 0
