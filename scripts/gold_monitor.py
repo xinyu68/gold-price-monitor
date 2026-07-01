@@ -127,7 +127,7 @@ def send_bark(config, title, content):
         return False
 
     bark_api = f'https://api.day.app/{bark_key}'
-    url = f"{bark_api}/{quote(title)}/{quote(content)}"
+    url = f"{bark_api}/{quote(title, safe='')}/{quote(content, safe='')}"
     req = Request(url, method='GET')
     req.add_header('User-Agent', 'Mozilla/5.0')
 
