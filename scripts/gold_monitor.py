@@ -73,7 +73,8 @@ def get_price(config):
     try:
         result = subprocess.run(
             [config['python_exe'], JIN10_CLIENT, 'quote', config['quote_code']],
-            capture_output=True, text=True, timeout=30
+            capture_output=True, text=True, timeout=30,
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)
         )
         if result.returncode != 0:
             return None, None, f"jin10_client执行失败: {result.stderr}"
