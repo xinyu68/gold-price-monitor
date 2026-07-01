@@ -120,10 +120,10 @@ def save_trend_data(data):
 
 
 def send_bark(config, title, content):
-    """通过 Bark 推送消息（有代理走代理，否则直连）"""
+    """通过 Bark 推送消息（有代理走代理，否则直连）。失败时输出完整内容到 stdout"""
     bark_key = config.get('bark_key', '')
     if not bark_key:
-        print("[Bark] 未配置 bark.key，跳过推送", file=sys.stderr)
+        print(f"❌ Bark未配置key\n{title}\n{content}")
         return False
 
     bark_api = f'https://api.day.app/{bark_key}'
@@ -141,7 +141,7 @@ def send_bark(config, title, content):
             resp = urlopen(req, timeout=10)
         return True
     except Exception as e:
-        print(f"[Bark推送失败] {e}", file=sys.stderr)
+        print(f"❌ Bark推送失败: {e}\n{title}\n{content}")
         return False
 
 
@@ -168,8 +168,7 @@ def main():
 
     if current_price is None:
         msg = err if err else "获取价格为空"
-        send_bark(config, "❌ 积存金监控异常", f"原因: {msg}\n时间: {now}")
-        print(f"[异常] {msg}")
+        print(f"❌ 积存金监控异常\n原因: {msg}\n时间: {now}")
         sys.exit(1)
 
     # 读取趋势数据
@@ -189,7 +188,6 @@ def main():
         save_trend_data(new_data)
         send_bark(config, "✅ 积存金监控初始化",
                    f"首次启动，基准价: {current_price}元/克\n时间: {now}")
-        print(f"[初始化] 基准价: {current_price}元/克")
         sys.exit(0)
 
     base_price = trend_data['base_price']
@@ -233,12 +231,10 @@ def main():
                        f"时间: {now}")
             send_bark(config, title, content)
             save_trend_data(new_data)
-            print(f"[通知] {title}")
         else:
             trend_data['price'] = current_price
             trend_data['time'] = now
             save_trend_data(trend_data)
-            print(f"[正常] 当前: {current_price}元/克, 变动: {change_pct*100:+.2f}%")
 
     # 情况2：上涨趋势中
     elif trend_direction == 'up':
@@ -254,13 +250,11 @@ def main():
                            f"时间: {now}")
                 send_bark(config, title, content)
                 trend_data['last_milestone'] = new_milestone
-                print(f"[里程碑] 上涨 {new_milestone*100:.0f}%")
 
             trend_data['price'] = current_price
             trend_data['trend_peak'] = current_price
             trend_data['time'] = now
             save_trend_data(trend_data)
-            print(f"[趋势延续] 上涨趋势创新高: {current_price}元/克")
         else:
             retrace_pct = (trend_peak - current_price) / trend_peak
             if retrace_pct >= retrace_threshold:
@@ -277,12 +271,10 @@ def main():
                            f"时间: {now}")
                 send_bark(config, title, content)
                 save_trend_data(new_data)
-                print(f"[通知] {title}")
             else:
                 trend_data['price'] = current_price
                 trend_data['time'] = now
                 save_trend_data(trend_data)
-                print(f"[小幅回调] 当前: {current_price}元/克, 回撤: -{retrace_pct*100:.2f}%")
 
     # 情况3：下跌趋势中
     elif trend_direction == 'down':
@@ -298,13 +290,11 @@ def main():
                            f"时间: {now}")
                 send_bark(config, title, content)
                 trend_data['last_milestone'] = new_milestone
-                print(f"[里程碑] 下跌 {new_milestone*100:.0f}%")
 
             trend_data['price'] = current_price
             trend_data['trend_valley'] = current_price
             trend_data['time'] = now
             save_trend_data(trend_data)
-            print(f"[趋势延续] 下跌趋势创新低: {current_price}元/克")
         else:
             bounce_pct = (current_price - trend_valley) / trend_valley
             if bounce_pct >= retrace_threshold:
@@ -321,12 +311,10 @@ def main():
                            f"时间: {now}")
                 send_bark(config, title, content)
                 save_trend_data(new_data)
-                print(f"[通知] {title}")
             else:
                 trend_data['price'] = current_price
                 trend_data['time'] = now
                 save_trend_data(trend_data)
-                print(f"[小幅反弹] 当前: {current_price}元/克, 反弹: +{bounce_pct*100:.2f}%")
 
 
 if __name__ == "__main__":
