@@ -120,7 +120,7 @@ def save_trend_data(data):
 
 
 def send_bark(config, title, content):
-    """通过 Bark 推送消息（先直连，失败再用代理）"""
+    """通过 Bark 推送消息（有代理走代理，否则直连）"""
     bark_key = config.get('bark_key', '')
     if not bark_key:
         print("[Bark] 未配置 bark.key，跳过推送", file=sys.stderr)
@@ -131,23 +131,17 @@ def send_bark(config, title, content):
     req = Request(url, method='GET')
     req.add_header('User-Agent', 'Mozilla/5.0')
 
+    proxy = config.get('proxy', '')
     try:
-        # 先尝试直接访问（api.day.app 在国内可直连）
-        resp = urlopen(req, timeout=10)
-        return True
-    except Exception:
-        # 回退到代理
-        proxy = config.get('proxy', '')
         if proxy:
-            try:
-                proxy_handler = ProxyHandler({'http': proxy, 'https': proxy})
-                opener = build_opener(proxy_handler)
-                resp = opener.open(req, timeout=15)
-                return True
-            except Exception as e:
-                print(f"[Bark代理推送失败] {e}", file=sys.stderr)
-                return False
-        print("[Bark直连失败且未配置代理]", file=sys.stderr)
+            proxy_handler = ProxyHandler({'http': proxy, 'https': proxy})
+            opener = build_opener(proxy_handler)
+            resp = opener.open(req, timeout=15)
+        else:
+            resp = urlopen(req, timeout=10)
+        return True
+    except Exception as e:
+        print(f"[Bark推送失败] {e}", file=sys.stderr)
         return False
 
 
