@@ -25,9 +25,9 @@ monitor:
   threshold: 0.01
 
 # 代理配置（可选）
-# Bark 的 api.day.app 在国内可直连，通常不需要代理
+# Bark 的 api.day.app 需要代理访问，建议开启
 proxy:
-  enabled: false
+  enabled: true
   address: "http://127.0.0.1:7897"
 
 # ====== 常用品种代码 ======
