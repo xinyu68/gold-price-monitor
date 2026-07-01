@@ -1,14 +1,15 @@
 """
-金价监控脚本 — 趋势策略 + Bark 推送
+金价监控脚本 — 双极追踪策略 + Bark 推送
 
-功能：
-  - 每次执行获取最新金价（通过 jin10_client.py）
-  - 趋势状态机：识别趋势启动/延续/回调/反弹
-  - 里程碑通知：趋势每推进 1% 推送一次
-  - Bark 推送：先直连，失败再用代理
+核心逻辑：
+  - 追踪上次推送以来的最高价(peak)和最低价(valley)
+  - 价格从基准突破阈值 → 趋势通知
+  - 价格从极值反转超过阈值 → 反转通知
+  - 高低点波动超过阈值 → 波动通知（解决涨跌各不到阈值但总波动大的问题）
+  - 每次通知后重置基准为当前价格，重新开始追踪
 
 配合 cron job 使用：
-  schedule: "*/10 * * * *"
+  schedule: "*/5 * * * *"
   no_agent: true
   script: "gold_monitor.py"
   deliver: "local"
@@ -35,9 +36,7 @@ def load_config():
         'python_exe': sys.executable,
         'bark_key': '',
         'quote_code': 'CZBJCJ',
-        'trend_threshold': 0.01,
-        'retrace_threshold': 0.01,
-        'milestone_step': 0.01,
+        'threshold': 0.01,
         'proxy': '',
     }
 
@@ -54,13 +53,16 @@ def load_config():
         bark = config.get('bark', {})
         proxy_cfg = config.get('proxy', {})
 
+        # 兼容新旧配置字段
+        threshold = monitor.get('threshold', None)
+        if threshold is None:
+            threshold = monitor.get('trend_threshold', defaults['threshold'])
+
         return {
             'python_exe': sys.executable,
             'bark_key': bark.get('key', defaults['bark_key']),
             'quote_code': monitor.get('quote_code', defaults['quote_code']),
-            'trend_threshold': monitor.get('trend_threshold', defaults['trend_threshold']),
-            'retrace_threshold': monitor.get('retrace_threshold', defaults['retrace_threshold']),
-            'milestone_step': monitor.get('milestone_step', defaults['milestone_step']),
+            'threshold': threshold,
             'proxy': proxy_cfg.get('address', '') if proxy_cfg.get('enabled') else '',
         }
     except Exception as e:
@@ -80,7 +82,6 @@ def get_price(config):
             return None, None, f"jin10_client执行失败: {result.stderr}"
 
         data = json.loads(result.stdout)
-        # 注意：字段嵌套在 data.* 下
         inner = data.get('data', data)
         price = inner.get('close') or inner.get('last') or inner.get('price')
 
@@ -95,28 +96,19 @@ def get_price(config):
         return None, None, f"获取价格异常: {e}"
 
 
-def load_trend_data():
-    """读取趋势状态数据"""
+def load_state():
+    """读取监控状态"""
     try:
         with open(PRICE_FILE, 'r') as f:
-            data = json.load(f)
-            return {
-                'price': data.get('price'),
-                'base_price': data.get('base_price'),
-                'trend_direction': data.get('trend_direction'),
-                'trend_peak': data.get('trend_peak'),
-                'trend_valley': data.get('trend_valley'),
-                'last_milestone': data.get('last_milestone', 0),
-                'time': data.get('time')
-            }
+            return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return None
 
 
-def save_trend_data(data):
-    """保存趋势状态数据"""
+def save_state(data):
+    """保存监控状态"""
     with open(PRICE_FILE, 'w') as f:
-        json.dump(data, f)
+        json.dump(data, f, ensure_ascii=False)
 
 
 def send_bark(config, title, content):
@@ -145,176 +137,128 @@ def send_bark(config, title, content):
         return False
 
 
-def check_milestone(base_price, current_price, direction, last_milestone, milestone_step):
-    """检查是否跨越新的里程碑"""
-    if direction == 'up':
-        change_pct = (current_price - base_price) / base_price
-    else:
-        change_pct = (base_price - current_price) / base_price
-
-    current_milestone = int(change_pct / milestone_step) * milestone_step
-
-    if current_milestone > last_milestone and current_milestone >= milestone_step:
-        return current_milestone, change_pct
-    return None, change_pct
+def make_state(base_price, peak, valley, time_str):
+    """构造状态字典"""
+    return {
+        'base_price': base_price,
+        'peak': peak,
+        'valley': valley,
+        'time': time_str
+    }
 
 
-def main():
-    config = load_config()
+def pct_str(value):
+    """格式化百分比，带正负号"""
+    return f"{'+' if value >= 0 else ''}{value*100:.2f}%"
+
+
+def check_price(config):
+    """
+    核心监控逻辑 — 双极追踪
+
+    追踪上次推送以来的最高价(peak)和最低价(valley)，三种通知条件：
+    1. 趋势突破：价格从基准价涨/跌超过阈值
+    2. 反转信号：价格从极值反转超过阈值（趋势方向回调）
+    3. 高波动区间：peak-valley 波动超过 2× 阈值
+
+    每次通知后重置基准为当前价格。
+    """
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     # 获取当前价格
     current_price, raw_data, err = get_price(config)
-
     if current_price is None:
         msg = err if err else "获取价格为空"
-        print(f"❌ 积存金监控异常\n原因: {msg}\n时间: {now}")
-        sys.exit(1)
+        send_bark(config, "❌ 积存金监控异常", f"原因: {msg}\n时间: {now}")
+        return
 
-    # 读取趋势数据
-    trend_data = load_trend_data()
+    # 加载或初始化状态
+    state = load_state()
+    if state is None or state.get('base_price') is None:
+        new_state = make_state(current_price, current_price, current_price, now)
+        save_state(new_state)
+        send_bark(config, "✅ 积存金监控启动",
+                  f"基准价: {current_price}元/克\n时间: {now}")
+        return
 
-    if trend_data is None or trend_data.get('base_price') is None:
-        # 首次运行，初始化
-        new_data = {
-            'price': current_price,
-            'base_price': current_price,
-            'trend_direction': None,
-            'trend_peak': current_price,
-            'trend_valley': current_price,
-            'last_milestone': 0,
-            'time': now
-        }
-        save_trend_data(new_data)
-        send_bark(config, "✅ 积存金监控初始化",
-                   f"首次启动，基准价: {current_price}元/克\n时间: {now}")
-        sys.exit(0)
+    base = state['base_price']
+    peak = state.get('peak', base)
+    valley = state.get('valley', base)
+    threshold = config['threshold']
 
-    base_price = trend_data['base_price']
-    trend_direction = trend_data['trend_direction']
-    trend_peak = trend_data.get('trend_peak', base_price)
-    trend_valley = trend_data.get('trend_valley', base_price)
-    last_milestone = trend_data.get('last_milestone', 0)
+    # 更新极值
+    peak = max(peak, current_price)
+    valley = min(valley, current_price)
 
-    trend_threshold = config['trend_threshold']
-    retrace_threshold = config['retrace_threshold']
-    milestone_step = config['milestone_step']
+    change_pct = (current_price - base) / base         # 相对基准涨跌幅
+    peak_retrace = (peak - current_price) / peak        # 从最高点回撤幅度
+    valley_bounce = (current_price - valley) / valley   # 从最低点反弹幅度
+    volatility = (peak - valley) / valley               # 区间波动幅度
 
-    change_pct = (current_price - base_price) / base_price
+    title = None
+    content = None
 
-    # 情况1：没有趋势，检查是否启动新趋势
-    if trend_direction is None:
-        if abs(change_pct) >= trend_threshold:
-            milestone = int(abs(change_pct) / milestone_step) * milestone_step
+    # ---- 条件1：高波动区间（区间波幅 ≥ 阈值，但净值变化小）----
+    if volatility >= threshold and abs(change_pct) < threshold:
+        title = f"🔄 积存金剧烈波动 ±{volatility*100:.1f}%"
+        content = (f"当前: {current_price}元/克\n"
+                   f"最高: {peak}元/克\n"
+                   f"最低: {valley}元/克\n"
+                   f"波幅: ±{volatility*100:.2f}%\n"
+                   f"基准: {base}元/克\n"
+                   f"时间: {now}")
 
-            if change_pct > 0:
-                new_data = {
-                    'price': current_price, 'base_price': base_price,
-                    'trend_direction': 'up', 'trend_peak': current_price,
-                    'trend_valley': base_price, 'last_milestone': milestone,
-                    'time': now
-                }
-                title = "📈积存金进入上涨趋势"
-            else:
-                new_data = {
-                    'price': current_price, 'base_price': base_price,
-                    'trend_direction': 'down', 'trend_peak': base_price,
-                    'trend_valley': current_price, 'last_milestone': milestone,
-                    'time': now
-                }
-                title = "📉积存金进入下跌趋势"
+    # ---- 条件2：反转信号（从极值反转超过阈值）----
+    # 上涨后回撤：peak 曾高出基准 ≥ 阈值，且从 peak 回撤 ≥ 阈值
+    elif (peak >= base * (1 + threshold)
+          and peak_retrace >= threshold):
+        title = f"⚠️ 积存金冲高回落 {pct_str(-peak_retrace)}"
+        content = (f"当前: {current_price}元/克\n"
+                   f"高点: {peak}元/克\n"
+                   f"回撤: {pct_str(-peak_retrace)}\n"
+                   f"仍较基准: {pct_str(change_pct)}\n"
+                   f"时间: {now}")
 
-            content = (f"当前累计{'上涨' if change_pct > 0 else '下跌'}："
-                       f"{'+' if change_pct > 0 else '-'}{abs(change_pct)*100:.2f}%\n"
-                       f"当前: {current_price}元/克\n"
-                       f"基准: {base_price}元/克\n"
-                       f"时间: {now}")
-            send_bark(config, title, content)
-            save_trend_data(new_data)
-        else:
-            trend_data['price'] = current_price
-            trend_data['time'] = now
-            save_trend_data(trend_data)
+    # 下跌后反弹：valley 曾低于基准 ≥ 阈值，且从 valley 反弹 ≥ 阈值
+    elif (valley <= base * (1 - threshold)
+          and valley_bounce >= threshold):
+        title = f"⚠️ 积存金探底反弹 {pct_str(valley_bounce)}"
+        content = (f"当前: {current_price}元/克\n"
+                   f"低点: {valley}元/克\n"
+                   f"反弹: {pct_str(valley_bounce)}\n"
+                   f"仍较基准: {pct_str(change_pct)}\n"
+                   f"时间: {now}")
 
-    # 情况2：上涨趋势中
-    elif trend_direction == 'up':
-        if current_price > trend_peak:
-            new_milestone, total_change = check_milestone(
-                base_price, current_price, 'up', last_milestone, milestone_step)
+    # ---- 条件3：趋势突破（净涨/跌幅超过阈值，兜底）----
+    elif change_pct >= threshold:
+        title = f"📈 积存金上涨 {pct_str(change_pct)}"
+        content = (f"当前: {current_price}元/克\n"
+                   f"基准: {base}元/克（上次推送价）\n"
+                   f"涨幅: {pct_str(change_pct)}\n"
+                   f"时间: {now}")
 
-            if new_milestone:
-                title = f"📈积存金持续上涨 +{total_change*100:.1f}%"
-                content = (f"当前: {current_price}元/克\n"
-                           f"基准: {base_price}元/克\n"
-                           f"累计: {total_change*100:+.2f}%\n"
-                           f"时间: {now}")
-                send_bark(config, title, content)
-                trend_data['last_milestone'] = new_milestone
+    elif change_pct <= -threshold:
+        title = f"📉 积存金下跌 {pct_str(change_pct)}"
+        content = (f"当前: {current_price}元/克\n"
+                   f"基准: {base}元/克（上次推送价）\n"
+                   f"跌幅: {pct_str(change_pct)}\n"
+                   f"时间: {now}")
 
-            trend_data['price'] = current_price
-            trend_data['trend_peak'] = current_price
-            trend_data['time'] = now
-            save_trend_data(trend_data)
-        else:
-            retrace_pct = (trend_peak - current_price) / trend_peak
-            if retrace_pct >= retrace_threshold:
-                new_data = {
-                    'price': current_price, 'base_price': current_price,
-                    'trend_direction': None, 'trend_peak': current_price,
-                    'trend_valley': current_price, 'last_milestone': 0,
-                    'time': now
-                }
-                title = f"⚠️积存金上涨回调 -{retrace_pct*100:.1f}%"
-                content = (f"当前: {current_price}元/克\n"
-                           f"高点: {trend_peak}元/克\n"
-                           f"回撤: -{retrace_pct*100:.2f}%\n"
-                           f"时间: {now}")
-                send_bark(config, title, content)
-                save_trend_data(new_data)
-            else:
-                trend_data['price'] = current_price
-                trend_data['time'] = now
-                save_trend_data(trend_data)
+    # ---- 有通知则发送并重置状态 ----
+    if title and content:
+        send_bark(config, title, content)
+        # 重置：基准设为当前价格，极值也归位
+        new_state = make_state(current_price, current_price, current_price, now)
+        save_state(new_state)
+    else:
+        # 无通知，只更新极值和价格
+        new_state = make_state(base, peak, valley, now)
+        save_state(new_state)
 
-    # 情况3：下跌趋势中
-    elif trend_direction == 'down':
-        if current_price < trend_valley:
-            new_milestone, total_change = check_milestone(
-                base_price, current_price, 'down', last_milestone, milestone_step)
 
-            if new_milestone:
-                title = f"📉积存金持续下跌 -{total_change*100:.1f}%"
-                content = (f"当前: {current_price}元/克\n"
-                           f"基准: {base_price}元/克\n"
-                           f"累计: -{total_change*100:.2f}%\n"
-                           f"时间: {now}")
-                send_bark(config, title, content)
-                trend_data['last_milestone'] = new_milestone
-
-            trend_data['price'] = current_price
-            trend_data['trend_valley'] = current_price
-            trend_data['time'] = now
-            save_trend_data(trend_data)
-        else:
-            bounce_pct = (current_price - trend_valley) / trend_valley
-            if bounce_pct >= retrace_threshold:
-                new_data = {
-                    'price': current_price, 'base_price': current_price,
-                    'trend_direction': None, 'trend_peak': current_price,
-                    'trend_valley': current_price, 'last_milestone': 0,
-                    'time': now
-                }
-                title = f"⚠️积存金下跌反弹 +{bounce_pct*100:.1f}%"
-                content = (f"当前: {current_price}元/克\n"
-                           f"低点: {trend_valley}元/克\n"
-                           f"反弹: +{bounce_pct*100:.2f}%\n"
-                           f"时间: {now}")
-                send_bark(config, title, content)
-                save_trend_data(new_data)
-            else:
-                trend_data['price'] = current_price
-                trend_data['time'] = now
-                save_trend_data(trend_data)
+def main():
+    config = load_config()
+    check_price(config)
 
 
 if __name__ == "__main__":
