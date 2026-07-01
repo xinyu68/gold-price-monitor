@@ -6,31 +6,21 @@
 
 ## 让 Hermes Agent 搭建
 
-把下面这段话复制给 Hermes Agent，它会自动完成搭建：
+把下面这段话复制给 Hermes Agent：
 
 ```
-帮我搭建金价监控。
-
-GitHub 地址：https://github.com/xinyu68/gold-price-monitor
-
-需要你做的事：
-1. 克隆项目到本地
-2. 复制 config_template.yaml 为 config.yaml，填入我的 Token：
-   - 金十数据 Token：sk-xxx（替换为你的）
-   - Bark Key：xxx（替换为你的）
-3. 运行 install.py 安装脚本和 skill 到 Hermes
-4. 创建定时任务：每 10 分钟运行 gold_monitor.py，涨跌幅超 1% 推送通知
+帮我搭建金价监控，参考 https://github.com/xinyu68/gold-price-monitor
 ```
+
+Hermes 会自动克隆项目、安装依赖、配置定时任务，过程中会问你要所需的 Token。
 
 **前置条件**：
 
 | 需要准备 | 获取方式 |
 |---------|----------|
 | Python 3.11+ | [python.org](https://www.python.org/downloads/) |
-| 金十数据 Token（`sk-xxx`） | [mcp.jin10.com/app](https://mcp.jin10.com/app/) |
-| Bark Key | iPhone 安装 [Bark](https://bark.day.app)，打开即显示 |
-
-**常用品种代码**：`CZBJCJ`（浙商积存金）、`ICBCRYJCJ`（工行如意积存金）、`XAUUSD`（现货黄金/美元）
+| 金十数据 Token | [mcp.jin10.com/app](https://mcp.jin10.com/app/) 免费注册获取 |
+| Bark Key（iOS 用户） | iPhone 安装 [Bark](https://bark.day.app)，打开即显示 |
 
 ---
 
