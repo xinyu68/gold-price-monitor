@@ -9,7 +9,7 @@
   - 每次通知后重置基准为当前价格，重新开始追踪
 
 配合 cron job 使用：
-  schedule: "*/5 * * * *"
+  schedule: "*/4 * * * *"
   no_agent: true
   script: "gold_monitor.py"
   deliver: "local"

@@ -132,7 +132,7 @@ gold-price-monitor/
 ## 常见问题
 
 **Q: 定时任务只执行一次就消失了？**
-用 `schedule: "*/5 * * * *"`（cron 表达式），不要用 `schedule: "5m"`（一次性延迟）。
+用 `schedule: "*/4 * * * *"`（cron 表达式），不要用 `schedule: "4m"`（一次性延迟）。
 
 **Q: Bark 推送收不到？**
 测试直连：`curl https://api.day.app/{你的Key}/test/test`
