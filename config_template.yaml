@@ -38,9 +38,9 @@ monitor:
   # 向后兼容：若仅提供 threshold 字段（旧配置），则自动作为 breakout/reversal/milestone 的默认值
 
 # 代理配置（可选）
-# Bark 的 api.day.app 需要代理访问，建议开启
+# Bark 本身不要求代理；仅在当前设备直连失败时按需开启
 proxy:
-  enabled: true
+  enabled: false
   address: "http://127.0.0.1:7897"
 
 # ====== 常用品种代码 ======

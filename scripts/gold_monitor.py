@@ -21,7 +21,6 @@ import os
 import subprocess
 from datetime import datetime
 from urllib.request import urlopen, Request, ProxyHandler, build_opener
-from urllib.parse import quote
 
 # ============ 配置 ============
 # 优先从 config.yaml 读取，也可直接修改此处
@@ -140,21 +139,28 @@ def send_bark(config, title, content):
         return False
 
     bark_api = f'https://api.day.app/{bark_key}'
-    url = f"{bark_api}/{quote(title, safe='')}/{quote(content, safe='')}"
-    req = Request(url, method='GET')
+    payload = json.dumps({'title': title, 'body': content}, ensure_ascii=False).encode('utf-8')
+    req = Request(bark_api, data=payload, method='POST')
     req.add_header('User-Agent', 'Mozilla/5.0')
+    req.add_header('Content-Type', 'application/json; charset=utf-8')
 
     proxy = config.get('proxy', '')
     try:
         if proxy:
             proxy_handler = ProxyHandler({'http': proxy, 'https': proxy})
             opener = build_opener(proxy_handler)
-            resp = opener.open(req, timeout=15)
+            resp = opener.open(req, timeout=20)
         else:
-            resp = urlopen(req, timeout=10)
+            resp = urlopen(req, timeout=20)
+        with resp:
+            result = json.load(resp)
+        if str(result.get('code')) != '200':
+            print(f"❌ Bark推送失败: 服务端返回 code={result.get('code')}\n{title}\n{content}")
+            return False
         return True
     except Exception as e:
-        print(f"❌ Bark推送失败: {e}\n{title}\n{content}")
+        # 异常文本可能包含带 Key 的请求 URL，不要写入日志
+        print(f"❌ Bark推送失败: {type(e).__name__}\n{title}\n{content}")
         return False
 
 

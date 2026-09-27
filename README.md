@@ -44,7 +44,7 @@ Hermes 会自动克隆项目、安装依赖、配置定时任务，过程中会�
 |------|------|------|
 | 数据源 | [金十数据 MCP](https://mcp.jin10.com/app/) | 实时金价、K线、快讯、财经日历 |
 | 编排层 | [Hermes Agent](https://hermes-agent.nousresearch.com) | 定时任务、AI 推理、错误处理 |
-| 推送层 | [Bark](https://bark.day.app) | iOS 推送通知（需代理访问） |
+| 推送层 | [Bark](https://bark.day.app) | iOS 推送通知（代理按本机网络情况选配） |
 | 协议 | MCP Streamable HTTP | AI Agent 原生数据接口 |
 
 ## 监控策略

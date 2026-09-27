@@ -142,37 +142,16 @@ def check_bark():
             print(f"{WARN} 跳过 Bark 测试（未配置 Key）")
             return False
 
-        from urllib.request import urlopen, Request, ProxyHandler, build_opener
-        from urllib.parse import quote
-
-        title = quote("测试推送")
-        content = quote("环境检查通过")
-        url = f"https://api.day.app/{bark_key}/{title}/{content}"
-        req = Request(url, method='GET')
-        req.add_header('User-Agent', 'Mozilla/5.0')
-
-        try:
-            resp = urlopen(req, timeout=10)
-            print(f"{PASS} Bark 推送测试成功（直连）")
+        from gold_monitor import send_bark
+        proxy_cfg = config.get('proxy', {}) or {}
+        proxy = proxy_cfg.get('address', '') if proxy_cfg.get('enabled') else ''
+        if send_bark({'bark_key': bark_key, 'proxy': proxy}, '测试推送', '环境检查通过'):
+            print(f"{PASS} Bark 推送测试成功（按当前网络设置）")
             return True
-        except Exception:
-            # 尝试代理
-            proxy = config.get('proxy', {})
-            if proxy.get('enabled'):
-                proxy_handler = ProxyHandler({
-                    'http': proxy.get('address', ''),
-                    'https': proxy.get('address', '')
-                })
-                opener = build_opener(proxy_handler)
-                resp = opener.open(req, timeout=15)
-                print(f"{PASS} Bark 推送测试成功（通过代理）")
-                return True
-            else:
-                print(f"{FAIL} Bark 推送失败（直连不通，未配置代理）")
-                return False
-
+        print(f"{FAIL} Bark 推送失败（请检查 Key 与当前网络设置）")
+        return False
     except Exception as e:
-        print(f"{FAIL} Bark 测试异常：{e}")
+        print(f"{FAIL} Bark 测试异常：{type(e).__name__}")
         return False
 
 
