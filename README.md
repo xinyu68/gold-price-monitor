@@ -155,7 +155,7 @@ gold-price-monitor/
 用 `schedule: "*/4 * * * *"`（cron 表达式），不要用 `schedule: "4m"`（一次性延迟）。
 
 **Q: Bark 推送收不到？**
-测试直连：`curl https://api.day.app/{你的Key}/test/test`
+在 `config.yaml` 的 `proxy.mode` 中选择 `inherit`（默认，沿用 HTTP 客户端的代理设置）、`direct`（强制直连）或 `proxy`（使用 `proxy.address`）。这只影响 Bark；旧配置的 `proxy.enabled` 仍兼容。可先用不含 Key 的 `curl --noproxy '*' -I https://api.day.app/` 检查直连，再运行 `python scripts/check_env.py` 发一条测试通知。
 
 **Q: 金十数据获取失败？**
 测试连接：`python scripts/jin10_client.py quote XAUUSD`

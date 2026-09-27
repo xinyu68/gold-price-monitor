@@ -37,10 +37,10 @@ monitor:
 
   # 向后兼容：若仅提供 threshold 字段（旧配置），则自动作为 breakout/reversal/milestone 的默认值
 
-# 代理配置（可选）
-# Bark 本身不要求代理；仅在当前设备直连失败时按需开启
+# 仅用于 Bark 推送，不影响金十数据请求
+# inherit：沿用 HTTP 客户端默认代理设置；direct：强制直连；proxy：使用下方指定代理
 proxy:
-  enabled: false
+  mode: inherit
   address: "http://127.0.0.1:7897"
 
 # ====== 常用品种代码 ======

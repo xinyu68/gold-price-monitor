@@ -16,11 +16,13 @@
   deliver: "local"
 """
 import json
+import base64
 import sys
 import os
 import subprocess
 from datetime import datetime
 from urllib.request import urlopen, Request, ProxyHandler, build_opener
+from urllib.parse import urlsplit, unquote
 
 # ============ 配置 ============
 # 优先从 config.yaml 读取，也可直接修改此处
@@ -50,7 +52,8 @@ DEFAULTS = {
     'volatility_amplitude': 0.02,
     'volatility_window': 10,
     'cooldown_minutes': 10,
-    'proxy': '',
+    'proxy_mode': 'inherit',
+    'proxy_address': '',
 }
 
 
@@ -74,7 +77,8 @@ def load_config():
 
         config['bark_key'] = bark.get('key', config['bark_key'])
         config['quote_code'] = monitor.get('quote_code', config['quote_code'])
-        config['proxy'] = proxy_cfg.get('address', '') if proxy_cfg.get('enabled') else ''
+        config['proxy_mode'] = proxy_cfg.get('mode', 'proxy' if proxy_cfg.get('enabled') else 'inherit')
+        config['proxy_address'] = proxy_cfg.get('address', '')
 
         # 新阈值字段，缺省回退到旧 threshold（若存在），再回退到默认
         legacy = monitor.get('threshold', None)
@@ -132,7 +136,7 @@ def save_state(data):
 
 
 def send_bark(config, title, content):
-    """通过 Bark 推送消息（有代理走代理，否则直连）。失败时输出完整内容到 stdout"""
+    """通过 Bark 推送消息，按配置继承环境、直连或使用指定代理"""
     bark_key = config.get('bark_key', '')
     if not bark_key:
         print(f"❌ Bark未配置key\n{title}\n{content}")
@@ -144,14 +148,42 @@ def send_bark(config, title, content):
     req.add_header('User-Agent', 'Mozilla/5.0')
     req.add_header('Content-Type', 'application/json; charset=utf-8')
 
-    proxy = config.get('proxy', '')
+    legacy_proxy = config.get('proxy', '')
+    proxy_mode = config.get('proxy_mode', 'proxy' if legacy_proxy else 'inherit')
+    proxy_address = config.get('proxy_address', legacy_proxy)
+    if proxy_mode not in ('inherit', 'direct', 'proxy'):
+        print(f"❌ Bark代理模式无效: {proxy_mode}")
+        return False
+    if proxy_mode == 'proxy' and not proxy_address:
+        print("❌ Bark代理模式缺少代理地址")
+        return False
+    if proxy_mode == 'proxy':
+        try:
+            parsed_proxy = urlsplit(proxy_address)
+            valid_proxy = parsed_proxy.scheme == 'http' and bool(parsed_proxy.hostname)
+            parsed_proxy.port
+        except ValueError:
+            valid_proxy = False
+        if not valid_proxy:
+            print("❌ Bark代理地址无效，需使用 HTTP 代理 URL")
+            return False
     try:
-        if proxy:
-            proxy_handler = ProxyHandler({'http': proxy, 'https': proxy})
-            opener = build_opener(proxy_handler)
-            resp = opener.open(req, timeout=20)
-        else:
+        if proxy_mode == 'inherit':
             resp = urlopen(req, timeout=20)
+        else:
+            if proxy_mode == 'proxy':
+                proxy_host = parsed_proxy.hostname
+                if ':' in proxy_host:
+                    proxy_host = f'[{proxy_host}]'
+                if parsed_proxy.port:
+                    proxy_host += f':{parsed_proxy.port}'
+                if parsed_proxy.username is not None:
+                    credentials = f'{unquote(parsed_proxy.username)}:{unquote(parsed_proxy.password or "")}'
+                    encoded = base64.b64encode(credentials.encode('utf-8')).decode('ascii')
+                    req.add_header('Proxy-Authorization', f'Basic {encoded}')
+                req.set_proxy(proxy_host, parsed_proxy.scheme)
+            opener = build_opener(ProxyHandler({}))
+            resp = opener.open(req, timeout=20)
         with resp:
             result = json.load(resp)
         if str(result.get('code')) != '200':

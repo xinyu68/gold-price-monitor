@@ -133,19 +133,13 @@ def check_jin10_connection():
 def check_bark():
     """测试 Bark 推送"""
     try:
-        import yaml
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            config = yaml.safe_load(f)
-
-        bark_key = config.get('bark', {}).get('key', '')
+        from gold_monitor import load_config, send_bark
+        config = load_config()
+        bark_key = config.get('bark_key', '')
         if not bark_key or bark_key.startswith('你的'):
             print(f"{WARN} 跳过 Bark 测试（未配置 Key）")
             return False
-
-        from gold_monitor import send_bark
-        proxy_cfg = config.get('proxy', {}) or {}
-        proxy = proxy_cfg.get('address', '') if proxy_cfg.get('enabled') else ''
-        if send_bark({'bark_key': bark_key, 'proxy': proxy}, '测试推送', '环境检查通过'):
+        if send_bark(config, '测试推送', '环境检查通过'):
             print(f"{PASS} Bark 推送测试成功（按当前网络设置）")
             return True
         print(f"{FAIL} Bark 推送失败（请检查 Key 与当前网络设置）")
